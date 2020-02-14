@@ -12,6 +12,7 @@
 
 #include "SDStore.h"
 #include <vector>
+#include <mutex>
 
 //#define LOG_LOCAL_LEVEL 5
 
@@ -29,11 +30,10 @@ typedef std::function<void(std::vector<uint8_t>)> SerialDataCallback;
 
 class ATcpServer {
   public:
-	ATcpServer(HardwareSerial *, SDStore *);
+	ATcpServer(HardwareSerial *, SDStore *, int );
 	~ATcpServer();
 
 	// TelnetServer methods:
-	void process();
 	void processData(std::vector<char>);
 	void stopReceive();
 	void startReceive(bool writeToSd = true, bool sendToTcp = true);
@@ -58,7 +58,7 @@ class ATcpServer {
 	std::vector<AsyncClient *> clients; // a list to hold all clients
 	bool receiveData = false;
 	AsyncServer *server = nullptr;
-	AsyncServer *serviceServer = nullptr;
+	//AsyncServer *serviceServer = nullptr;
 	SerialDataCallback _seralDataCallback = nullptr;
 	unsigned long _timeStart;
 	unsigned long _timeEnd;
@@ -75,6 +75,8 @@ class ATcpServer {
 	char _buffer[BUFFER_SIZE]{0};
 	HardwareSerial *_receiver;
 	SDStore *_store;
+	int _port;
+	std::mutex _mutex;
 };
 
 #endif

@@ -50,7 +50,7 @@ HardwareSerial *Receiver{&Serial2};
 
 WiFiWithEvents wifi{};
 SDStore store{CS_PIN};
-ATcpServer telnetServer{Receiver, &store}; // GPS receiver communication
+ATcpServer telnetServer{Receiver, &store, TCP_PORT}; // GPS receiver communication
 
 std::thread receiverThread;
 Queue<std::vector<char>> queue_buffer;

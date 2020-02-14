@@ -1,29 +1,15 @@
 #include "ATcpServer.h"
 
-ATcpServer::ATcpServer(HardwareSerial *receiver, SDStore *store) : clients{MAX_TCP_CLIENTS, nullptr}, _receiver{receiver}, _store{store} {}
+ATcpServer::ATcpServer(HardwareSerial *receiver, SDStore *store, int port) : clients{MAX_TCP_CLIENTS, nullptr}, _receiver{receiver}, _store{store}, _port{port} {}
 ATcpServer::~ATcpServer() { end(); }
 
-void ATcpServer::ATcpServer::process() {
-
-	////////////////////int bytesCount = _receiver->available();
-////////////////////
-	////////////////////if (bytesCount <= 0) {
-	////////////////////	return;
-	////////////////////}
-////////////////////
-	////////////////////int len = _receiver->readBytes(_buffer, bytesCount);
-	////////////////////if (len != bytesCount) {
-	////////////////////	log_e("Not all bytes read from uart, available: [%i], read: [%i]\n", bytesCount, len);
-	////////////////////}
-	////////////////////if (len > 0) {
-	////////////////////	processData(_buffer, len);
-	////////////////////}
-}
-
 void ATcpServer::processData(std::vector<char> data) {
-	
-	char *buffer = data.data();
+	std::unique_lock<std::mutex> mlock(_mutex);
 	int bytesCount = data.size();
+	data = std::vector<char>(data);
+	mlock.unlock();
+
+	char * buffer = data.data();
 
 	if (bytesCount > 0) {
 
@@ -98,15 +84,6 @@ void ATcpServer::handleNewClient(AsyncClient *client) {
 	client->onError([](void *r, AsyncClient *c, int8_t error) { ((ATcpServer *)(r))->handleError(c, error); }, this);
 	client->onDisconnect([](void *r, AsyncClient *c) { ((ATcpServer *)(r))->handleDisconnect(c); }, this);
 	client->onTimeout([](void *r, AsyncClient *c, uint32_t time) { ((ATcpServer *)(r))->handleTimeOut(c, time); }, this);
-
-	serviceServer->onClient(
-		[](void *s, AsyncClient *client) {
-			const char msg[] = "Service server\n";
-			if (client) {
-				client->write(msg);
-			}
-		},
-		this);
 }
 
 bool ATcpServer::isInProgress() const { return receiveData; }
@@ -143,8 +120,6 @@ void ATcpServer::startReceive(bool writeToSd, bool sendToTcp) {
 		server->begin();
 		log_v("TCP Server started\n");
 	}
-
-	// serviceServer->begin();
 
 	receiveData = true;
 	_timeEnd = 0;
@@ -209,8 +184,7 @@ void ATcpServer::setup() {
 	if (_writeToSd) {
 		_store->initSdCard();
 	}
-	server = new AsyncServer(TCP_PORT);
-	serviceServer = new AsyncServer(TCP_PORT + 1);
+	server = new AsyncServer(_port);
 	server->onClient([](void *s, AsyncClient *c) { ((ATcpServer *)(s))->handleNewClient(c); }, this);
 }
 

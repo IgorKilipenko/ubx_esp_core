@@ -35,6 +35,11 @@ template <typename T> class Queue {
 
 	void push(const T &item) {
 		std::unique_lock<std::mutex> mlock(mutex_);
+		if (queue_.size() > 100) {
+			log_w("BUFFER OVERFLOW");
+			for (int i = 0; i < queue_.size(); i++)
+				queue_.pop();
+		}
 		queue_.push(item);
 		mlock.unlock();
 		cond_.notify_one();
@@ -42,6 +47,11 @@ template <typename T> class Queue {
 	void push(const T *items, int len) {
 		std::unique_lock<std::mutex> mlock(mutex_);
 		for (int i = 0; i < len; i++) {
+			if (queue_.size() > 100) {
+				log_w("BUFFER OVERFLOW");
+				for (int i = 0; i < queue_.size(); i++)
+					queue_.pop();
+			}
 			queue_.push(items[i]);
 		}
 		mlock.unlock();
@@ -53,11 +63,12 @@ template <typename T> class Queue {
 		mlock.unlock();
 		return res;
 	}
-	Queue() = default;
+	Queue(int maxSize = 200) : BUF_SIZE{maxSize} {}; //= default;
 	Queue(const Queue &) = delete;			  // disable copying
 	Queue &operator=(const Queue &) = delete; // disable assignment
 
   private:
+  	const int BUF_SIZE;
 	std::queue<T> queue_;
 	std::mutex mutex_;
 	std::condition_variable cond_;

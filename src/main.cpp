@@ -76,11 +76,11 @@ void setup() {
 	disableLoopWDT();
 	Serial.begin(BAUD_SERIAL);
 	
-	Receiver->begin(0/*BAUND_RECEIVER*/, SERIAL_8N1, RXD2, TXD2);
+	Receiver->begin(BAUND_RECEIVER, SERIAL_8N1, RXD2, TXD2);
 	unsigned long detectedBaudRate = Receiver->baudRate();
-	if (detectedBaudRate) log_d("Receiver uart baudrate detecyed -> [ %i ]", detectedBaudRate);
+	if (detectedBaudRate) log_d("Receiver uart baudrate detecyed -> [ %lu ]", detectedBaudRate);
 	else {
-		log_e("Receiver baudrate not detected, -> [ %lu ]", detectedBaudRate);
+		log_w("Receiver baudrate not detected");
 		Receiver->begin(BAUND_RECEIVER, SERIAL_8N1, RXD2, TXD2);
 	}
 	

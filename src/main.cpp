@@ -10,6 +10,7 @@
 
 #include <Arduino.h>
 #include <thread>
+#include <future>
 #include <string>
 
 /* SD card */
@@ -40,7 +41,7 @@ HardwareSerial *Receiver{&Serial2};
 
 /* Serial */
 #define BAUD_SERIAL 115200	// Debug Serial baund rate
-#define BAUND_RECEIVER 921600 // GPS receiver baund rate
+#define BAUND_RECEIVER 0	// Auto detect baud //921600 // GPS receiver baund rate
 #define SERIAL_SIZE_RX 1024
 
 #include "utils.h"
@@ -53,7 +54,9 @@ SDStore store{CS_PIN};
 ATcpServer telnetServer{Receiver, &store, TCP_PORT}; // GPS receiver communication
 
 std::thread receiverThread;
-Queue<std::vector<char>> queue_buffer;
+
+using UartBuffer = Queue<std::vector<char>>;
+UartBuffer queue_buffer{500};
 
 void readReceiverData() {
 	int count = 0;
@@ -70,8 +73,17 @@ void readReceiverData() {
 }
 
 void setup() {
+	disableLoopWDT();
 	Serial.begin(BAUD_SERIAL);
-	Receiver->begin(BAUND_RECEIVER, SERIAL_8N1, RXD2, TXD2);
+	
+	Receiver->begin(0/*BAUND_RECEIVER*/, SERIAL_8N1, RXD2, TXD2);
+	unsigned long detectedBaudRate = Receiver->baudRate();
+	if (detectedBaudRate) log_d("Receiver uart baudrate detecyed -> [ %i ]", detectedBaudRate);
+	else {
+		log_e("Receiver baudrate not detected, -> [ %lu ]", detectedBaudRate);
+		Receiver->begin(BAUND_RECEIVER, SERIAL_8N1, RXD2, TXD2);
+	}
+	
 	RTCM->begin(38400, SERIAL_8N1, RXD1, TXD1);
 
 	Receiver->setRxBufferSize(SERIAL_SIZE_RX);
@@ -95,14 +107,27 @@ void setup() {
 
 /*volatile*/
 void loop() {
+	std::vector<std::vector<char>> buffer{};
 	while (!queue_buffer.empty()) {
-		auto data = queue_buffer.pop();
-		std::thread sender([&] {
-			vTaskPrioritySet(nullptr, 1);
-			telnetServer.processData(data);
-		});
-		sender.join();
-		delay(1);
+		const auto &data = queue_buffer.pop();
+		buffer.push_back(data);
 	}
-	delay(1);
+	auto tcpSender = std::async(std::launch::async,
+								[](const std::vector<std::vector<char>> &buffer) -> int {
+									for (const auto &data : buffer) {
+										// vTaskPrioritySet(nullptr, 1);
+										telnetServer.processData(data);
+										delay(1);
+										// return data.size();
+									}
+									return 0;
+								},
+								buffer);
+	try {
+		tcpSender.wait();
+	} catch (std::exception &e) {
+		log_e("catch exception, %s\n", e.what());
+	}
+
+	delay(100);
 }

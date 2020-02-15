@@ -4,15 +4,13 @@ ATcpServer::ATcpServer(HardwareSerial *receiver, SDStore *store, int port) : cli
 ATcpServer::~ATcpServer() { end(); }
 
 void ATcpServer::processData(std::vector<char> data) {
-	std::unique_lock<std::mutex> mlock(_mutex);
+	
+	std::lock_guard<std::mutex> mlock(_mutex);
+	
 	int bytesCount = data.size();
-	data = std::vector<char>(data);
-	mlock.unlock();
-
-	char * buffer = data.data();
+	const char * buffer = data.data();
 
 	if (bytesCount > 0) {
-
 		if (receiveData) {
 			if (_writeToSd && _store->isInitialize() && _store->isOpenFile()) {
 				_store->writeToSD(buffer, bytesCount);
